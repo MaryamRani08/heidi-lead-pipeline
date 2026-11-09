@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+data/cache/
+data/access_log.jsonl
+data/0*.csv
+data/0*.jsonl
+output/

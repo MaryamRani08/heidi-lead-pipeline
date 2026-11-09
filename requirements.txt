@@ -1,0 +1,10 @@
+requests>=2.31
+beautifulsoup4>=4.12
+pandas>=2.0
+openpyxl>=3.1
+pyyaml>=6.0
+python-dotenv>=1.0
+tqdm>=4.66
+google-genai>=1.0      # only needed for the LLM step (Gemini)
+# anthropic>=0.40      # optional: provider = anthropic
+# openai>=1.40         # optional: provider = openai

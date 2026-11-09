@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------
+# Heidi Systems lead pipeline - configuration
+# To run for another city, change `city` and `postcode_ranges`.
+# ---------------------------------------------------------------
+
+city: Berlin
+postcode_ranges:            # inclusive ranges of German postcodes for the city
+  - [10115, 14199]
+
+# Polite crawling
+http:
+  user_agent: "HeidiCaseStudyLeadBot/1.0 (research project; contact via GitHub repo)"
+  delay_seconds: 1.5        # pause between requests to the same host
+  timeout_seconds: 20
+  max_retries: 2
+  respect_robots_txt: true
+  max_pages_per_company: 6  # homepage + up to 5 subpages
+
+# Discovery sources
+sources:
+  jacasa_directory:
+    enabled: true
+    base_url: "https://www.jacasa.de/hausverwaltung-verzeichnis/{letter}?page={page}"
+    letters: "abcdefghijklmnopqrstuvwxyz"
+    max_pages_per_letter: 8
+  manual_seeds:
+    enabled: true
+    path: data/seeds_manual.csv   # companies added by hand (e.g. large managers found via web search)
+
+# LLM extraction (optional - pipeline runs with rules only if no key is set)
+llm:
+  enabled: true
+  provider: gemini          # gemini | anthropic | openai  (only the API key changes)
+  model: gemini-3.7-flash          # 3.8-flash was overloaded (503) during development
+  fallback_models: [gemini-3.6-flash, gemini-3.5-flash, gemini-3.8-flash, gemini-3.5-flash-lite, auto]  # tried in order on 503 / 404 / daily quota
+  max_input_chars: 12000
+  requests_per_minute: 8    # stay under free-tier limits
+  send_impressum_to_llm: false   # privacy: personal contact data is extracted by rules only
+
+# Scoring weights (must sum to 100)
+weights:
+  service_fit: 25
+  portfolio_size: 20
+  billing_relevance: 15
+  regulatory_opportunity: 10
+  switching_opportunity: 10
+  digital_maturity: 10
+  reachability: 10
+
+priority_thresholds:
+  A: 70
+  B: 50
+
+top_n: 25
+validation_sample_share: 0.10
