@@ -174,7 +174,10 @@ def stage_score(cfg, args):
                                              "Evidence quote": f[k]["quote"], "Source URL": f[k]["url"],
                                              "Extracted by": f[k]["source"], "Correct? (Y/N)": "", "Note": ""})
 
-    leads = pd.DataFrame(rows).sort_values(["Lead score", "Confidence"], ascending=[False, True]).reset_index(drop=True)
+    leads = pd.DataFrame(rows)
+    leads["_conf"] = leads["Confidence"].map({"High": 0, "Medium": 1, "Low": 2})
+    leads = (leads.sort_values(["Lead score", "_conf"], ascending=[False, True], kind="stable")
+             .drop(columns="_conf").reset_index(drop=True))
     leads.insert(0, "Rank", range(1, len(leads) + 1))
     top_cols = ["Rank", "Priority", "Lead score", "Confidence", "Company", "Website", "Management types",
                 "Units (stated)", "Decision maker(s)", "LinkedIn (manual check)", "Email (direct)", "Email (general)",

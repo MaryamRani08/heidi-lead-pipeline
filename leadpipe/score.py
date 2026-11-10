@@ -30,7 +30,7 @@ def merge(rules: dict, llm: dict | None, directory: dict) -> dict:
         if llm_key:
             lv = _llm(llm, llm_key)
             if lv and (llm_match is None or llm_match(lv["value"])):
-                return {"value": lv["value"], "quote": lv["quote"], "url": llm_url, "source": "llm"}
+                return {"value": lv["value"], "quote": lv["quote"], "url": lv.get("url") or llm_url, "source": "llm"}
         return {"value": None, "quote": "", "url": "", "source": ""}
 
     for t, rk in (("WEG", "weg"), ("Mietverwaltung", "miet"), ("Sondereigentum", "sev"), ("Gewerbe", "gewerbe"), ("Makler", "broker")):

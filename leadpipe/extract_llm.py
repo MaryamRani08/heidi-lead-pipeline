@@ -208,7 +208,8 @@ class LLMExtractor:
             self.stats["claims"] += 1
             g = quote_is_grounded(v.get("quote"), source) and quote_supports(k, v["value"], v.get("quote"))
             self.stats["claims_grounded"] += int(g)
+            page_url = next((p["url"] for p in usable if quote_is_grounded(v.get("quote"), p["text"])), "")
             out[k] = {"value": v["value"] if g else None, "quote": v.get("quote") or "", "grounded": g,
-                      "rejected_value": None if g else v["value"]}
+                      "url": page_url, "rejected_value": None if g else v["value"]}
         out["_source_urls"] = [p["url"] for p in usable]
         return out
