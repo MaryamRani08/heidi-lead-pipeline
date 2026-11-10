@@ -29,7 +29,8 @@ def ev(value, hit) -> dict:
 
 # ---------------- patterns ----------------
 P = {
-    "weg": re.compile(r"WEG[- ]?Verwaltung|Wohnungseigentümergemeinschaft|Wohnungseigentumsverwaltung|Verwaltung von Wohnungseigentum|\bWEG\b", re.I),
+    # case-sensitive on purpose: "Weg" (path) must not count as "WEG" (owners' association) - found in validation
+    "weg": re.compile(r"\bWEG\b|WEG-Verwalt|[Ww]ohnungseigentümergemeinschaft|[Ww]ohnungseigentumsverwaltung|[Vv]erwaltung von Wohnungseigentum|[Ee]igentümergemeinschaften"),
     "miet": re.compile(r"Mietverwaltung|Mietshausverwaltung|Mietshäuser|Zinshaus|Verwaltung von Miet|Mietobjekte|Mehrfamilienh", re.I),
     "sev": re.compile(r"Sondereigentumsverwaltung|\bSEV\b|Sondereigentum", re.I),
     "gewerbe": re.compile(r"Gewerbe(?:immobilien|objekte|verwaltung|einheiten)|Büroimmobilien|commercial", re.I),
@@ -49,7 +50,7 @@ P = {
 }
 PROVIDERS = re.compile(r"\b(ista|Techem|Brunata|Minol|KALO|Kalorimeta|Metrona|Qundis|noventic|Wärmemessdienst|Viterra|BFW|Messdienst Lorenz|ENERGIE-Service)\b")
 PROVIDER_RELATION = re.compile(r"Partner|Zusammenarbeit|zusammen mit|beauftragt|Messdienst|Abrechnung durch|abgerechnet|Ablesung durch|Vertrag", re.I)
-SOFTWARE = re.compile(r"\b(DOMUS|Immoware24|casavi|Haufe|PowerHaus|axera|Karthago|Wodis|iX-Haus|Facilioo|Hausperfekt|Fairwalter|objego|Aareon|SAP RE-FX|GES|EVERREAL|Immoledo|Immocloud)\b", re.I)
+SOFTWARE = re.compile(r"\b(DOMUS|Immoware24|casavi|Haufe|PowerHaus|axera|Karthago|Wodis|iX-Haus|Facilioo|Hausperfekt|Fairwalter|objego|Aareon|SAP RE-FX|GES|EVERREAL|Immoledo|Immocloud|HausSoft|MEVIVO|Wowiport|Immoware)\b", re.I)
 
 EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+\s?(?:@|\(at\)|\[at\]| at )\s?[A-Za-z0-9.\-]+\s?(?:\.|\(dot\)|\[dot\])\s?[A-Za-z]{2,}")
 GENERIC_PREFIX = re.compile(r"^(info|kontakt|contact|office|mail|post|service|verwaltung|hausverwaltung|empfang|zentrale|hallo|hello|team|buero|büro|anfrage|bewerbung|datenschutz|webmaster|support|noreply|no-reply|investor|investorrelations|ir|presse|press|karriere|jobs|career|weg|miete|mietverwaltung|buchhaltung|technik|notdienst|vermietung|kundenservice|immobilien|rechnung|rechnungen|reparatur|ausschreibung|vertrieb|berlin|apartment|b2b|haustechnik|mein-verwalter|kritik|bau|wohnen|hv|email|e-mail|verkauf|mieter|mieterservice|eigentuemer|einkauf|backoffice|zentral|anfragen)\b", re.I)
@@ -60,7 +61,11 @@ GF_LINE = re.compile(
     r"(?:Geschäftsführ(?:er|erin|ung|ende[rn]?\s+Gesellschafter(?:in)?)|Vertreten durch(?:\s+(?:den|die)\s+Geschäftsführer(?:in)?)?|Inhaber(?:in)?|Vorstand|Managing Director|Geschäftsleitung)"
     r"\s*[:\-]?\s*\n?\s*([^\n]{3,160})", re.I)
 _W = r"[A-ZÄÖÜ][a-zäöüß]+(?:-\s?[A-ZÄÖÜ][a-zäöüß]+)?"
-NAME = re.compile(r"(?:(?:Dr\.|Prof\.|Dipl\.-[A-Za-zä]+\.?|Kfm\.)\s+)*" + _W + r"(?:\s+(?:von|van|de|zu)\b)?\s+" + _W)
+_TITLE = r"(?:(?:Dr\.|Prof\.|Dipl\.-[A-Za-zä]+\.?|Kfm\.)\s+)*"
+# three words (e.g. "Josephine Celine Pauer") only when the name stands alone; otherwise first name + surname,
+# so two people on one line ("Michelle Hochheiden-Welp Victor Hochheiden") are not merged - both found in validation
+NAME = re.compile(_TITLE + _W + r"\s+" + _W + r"\s+" + _W + r"(?=\s*(?:$|,|;|\bund\b|&))"
+                  r"|" + _TITLE + _W + r"(?:\s+(?:von|van|de|zu)\b)?\s+" + _W)
 NAME_PREFIX = re.compile(r"^(?:(?:Herrn?|Frau|Kaufmann|Kauffrau|Kfm\.|Architekt(?:in)?|Dipl\.-[A-Za-zä]+\.?|Rechtsanwalt|Rechtsanwältin|RA)\s+)+")
 NAME_STOP = re.compile(r"\b(Ihrer|Ihre|Jahren|Sämtliche|Gmb|Deutschland|Email|E-Mail|Immo|Rechte|Urheber|Markterfahrung|Gesellschafter|Geschäftsführ\w*|Inhaber\w*)\b")
 NOUN_SUFFIX = re.compile(r"(ung|ungen|heit|keit|schaft|tion|tät|nis|haltung|konzept\w*|erfahrung)$")
@@ -213,6 +218,10 @@ def extract(pages: list[dict]) -> dict:
         for m in GF_LINE.finditer(p["text"]):
             for n in NAME.findall(m.group(1)):
                 n = NAME_PREFIX.sub("", n.strip()).rstrip("-").strip()
+                parts = n.split()
+                while len(parts) > 2 and (NOT_NAMES.search(parts[-1]) or NAME_STOP.search(parts[-1])):
+                    parts = parts[:-1]  # e.g. "Victor Hochheiden Kontakt" -> "Victor Hochheiden"
+                n = " ".join(parts)
                 tokens = [w for w in n.split() if w not in ("von", "van", "de", "zu") and not w.endswith(".")]
                 if len(tokens) < 2 or NAME_STOP.search(n) or any(NOUN_SUFFIX.search(w.lower()) for w in tokens):
                     continue

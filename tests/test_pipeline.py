@@ -59,6 +59,20 @@ def test_rules_and_score():
     assert "Techem" in sc.sales_angle(f, s)
 
 
+def test_validation_findings():
+    """Cases found during the manual validation of the Berlin run."""
+    weg = extract([{"role": "home", "url": "https://x.de", "text": "Der Weg zur Premium-Domain. Kaufen Sie jetzt."}])
+    assert not weg["weg"]["value"]
+    weg2 = extract([{"role": "home", "url": "https://x.de", "text": "Mietverwaltung und WEG-Verwaltung in Berlin."}])
+    assert weg2["weg"]["value"]
+    n1 = extract([{"role": "impressum", "url": "https://x.de/impressum", "text": "Vertreten durch:\nJosephine Celine Pauer\nKontakt"}])
+    assert n1["decision_makers"]["value"] == "Josephine Celine Pauer"
+    n2 = extract([{"role": "impressum", "url": "https://x.de/impressum", "text": "Vertreten durch: Michelle Hochheiden-Welp Victor Hochheiden Kontakt"}])
+    assert n2["decision_makers"]["value"] == "Michelle Hochheiden-Welp; Victor Hochheiden"
+    sw = extract([{"role": "home", "url": "https://x.de", "text": "Wir arbeiten mit HausSoft und MEVIVO."}])
+    assert "HausSoft" in sw["software"]["value"]
+
+
 def test_hallucination_guard():
     src = "Wir verwalten über 2.500 Wohneinheiten in Berlin."
     assert quote_is_grounded("verwalten über 2.500 Wohneinheiten", src)

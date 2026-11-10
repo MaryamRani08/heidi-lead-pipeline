@@ -86,6 +86,27 @@ Output: `output/heidi_berlin_leads.xlsx` (upload it to Google Drive and open it 
 
 **Validation:** open the `Validation` tab, check each sampled field against its source URL, and enter Y/N. Accuracy = Y / (Y + N), reported with the sample size.
 
+## Results (Berlin run, November 2026)
+
+| Stage | Result |
+|---|---|
+| Discovered | 385 candidates → 375 unique property managers (10 excluded, each with a reason) |
+| Websites analysed | 304 (81%) |
+| LLM claims | 698 made → 618 (89%) passed the evidence check, the rest were discarded |
+| Priority | 6 A-leads · 54 B-leads · 315 C-leads |
+| Contacts | 165 leads with a named decision maker (Impressum); LinkedIn confirmed 4 of 12 top decision makers |
+| Runtime | ~70 minutes for the whole city on a laptop |
+
+**Manual validation:** 41 randomly sampled fields were checked by hand against the source websites.
+38 could be judged (3 websites unreachable): **35 correct = 92%** (rules 30/32, Gemini 5/6).
+
+Errors found, and the fix for each one (with a regression test in `tests/`):
+- the number of **funds** was read as the number of managed units: kept as a known limitation of the semantic check
+- the German word **"Weg"** (path) matched as **"WEG"** (owners' association): WEG is now matched case-sensitively
+- a three-part name was **truncated** ("Josephine Celine" without the surname): names may now have three words when they stand alone
+
+Human corrections from the verification of the top 25 are kept in `data/manual_overrides.csv`, each with a note.
+
 ## Reuse for another city
 Change `city` and `postcode_ranges` in `config.yaml` (e.g. Hamburg `[[20095, 22769]]`), add any seeds, and run again. To switch the LLM provider, set `llm.provider` to `anthropic` or `openai`, set the model, and put the matching key in `.env`.
 
