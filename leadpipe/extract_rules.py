@@ -52,7 +52,7 @@ PROVIDER_RELATION = re.compile(r"Partner|Zusammenarbeit|zusammen mit|beauftragt|
 SOFTWARE = re.compile(r"\b(DOMUS|Immoware24|casavi|Haufe|PowerHaus|axera|Karthago|Wodis|iX-Haus|Facilioo|Hausperfekt|Fairwalter|objego|Aareon|SAP RE-FX|GES|EVERREAL|Immoledo|Immocloud)\b", re.I)
 
 EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+\s?(?:@|\(at\)|\[at\]| at )\s?[A-Za-z0-9.\-]+\s?(?:\.|\(dot\)|\[dot\])\s?[A-Za-z]{2,}")
-GENERIC_PREFIX = re.compile(r"^(info|kontakt|contact|office|mail|post|service|verwaltung|hausverwaltung|empfang|zentrale|hallo|hello|team|buero|büro|anfrage|bewerbung|datenschutz|webmaster|support|noreply|no-reply|investor|investorrelations|ir|presse|press|karriere|jobs|career|weg|miete|mietverwaltung|buchhaltung|technik|notdienst|vermietung|kundenservice|immobilien)\b", re.I)
+GENERIC_PREFIX = re.compile(r"^(info|kontakt|contact|office|mail|post|service|verwaltung|hausverwaltung|empfang|zentrale|hallo|hello|team|buero|büro|anfrage|bewerbung|datenschutz|webmaster|support|noreply|no-reply|investor|investorrelations|ir|presse|press|karriere|jobs|career|weg|miete|mietverwaltung|buchhaltung|technik|notdienst|vermietung|kundenservice|immobilien|rechnung|rechnungen|reparatur|ausschreibung|vertrieb|berlin|apartment|b2b|haustechnik|mein-verwalter|kritik|bau|wohnen|hv|email|e-mail|verkauf|mieter|mieterservice|eigentuemer|einkauf|backoffice|zentral|anfragen)\b", re.I)
 FREEMAIL = re.compile(r"@(gmail|googlemail|gmx|web|t-online|yahoo|outlook|hotmail|icloud|aol|freenet|posteo|mail)\.", re.I)
 PHONE = re.compile(r"(?:Tel(?:efon)?\.?|Fon|T)\s*:?\s*(\+?\d[\d\s/()\-]{6,20}\d)")
 HRB = re.compile(r"HR[AB]\s?\d{3,7}\s?[A-Z]?")
@@ -60,7 +60,10 @@ GF_LINE = re.compile(
     r"(?:Geschäftsführ(?:er|erin|ung|ende[rn]?\s+Gesellschafter(?:in)?)|Vertreten durch(?:\s+(?:den|die)\s+Geschäftsführer(?:in)?)?|Inhaber(?:in)?|Vorstand|Managing Director|Geschäftsleitung)"
     r"\s*[:\-]?\s*\n?\s*([^\n]{3,160})", re.I)
 _W = r"[A-ZÄÖÜ][a-zäöüß]+(?:-\s?[A-ZÄÖÜ][a-zäöüß]+)?"
-NAME = re.compile(r"(?:(?:Dr\.|Prof\.|Dipl\.-[A-Za-zä]+\.?|Kfm\.)\s+)*" + _W + r"(?:\s+(?:von|van|de|zu)\b)?(?:\s+" + _W + r"){1,2}")
+NAME = re.compile(r"(?:(?:Dr\.|Prof\.|Dipl\.-[A-Za-zä]+\.?|Kfm\.)\s+)*" + _W + r"(?:\s+(?:von|van|de|zu)\b)?\s+" + _W)
+NAME_PREFIX = re.compile(r"^(?:(?:Herrn?|Frau|Kaufmann|Kauffrau|Kfm\.|Architekt(?:in)?|Dipl\.-[A-Za-zä]+\.?|Rechtsanwalt|Rechtsanwältin|RA)\s+)+")
+NAME_STOP = re.compile(r"\b(Ihrer|Ihre|Jahren|Sämtliche|Gmb|Deutschland|Email|E-Mail|Immo|Rechte|Urheber|Markterfahrung|Gesellschafter|Geschäftsführ\w*|Inhaber\w*)\b")
+NOUN_SUFFIX = re.compile(r"(ung|ungen|heit|keit|schaft|tion|tät|nis|haltung|konzept\w*|erfahrung)$")
 NOT_NAMES = re.compile(r"GmbH|Straße|Str\.|Berlin|Amtsgericht|Registergericht|Telefon|Gesellschaft|Hausverwaltung|Immobilien|Verwaltung|Handelsregister|"
                        r"Unsere|Unser|Dienstleistung|Leistung|Kontakt|Team|Datenschutz|Impressum|Angaben|Sitz|Steuer|Umsatz|Verantwortlich|Inhalt|Service|Mitglied|Verband|Telefax|Weitere|Kunden|Eigentümer|Mieter|Willkommen|Startseite|Partner", re.I)
 
@@ -94,6 +97,19 @@ CONTEXT = {
 }
 
 
+UNITS_WANT = re.compile(r"verwalt|betreu|Bestand|Portfolio|vertrauen|managen|Verwaltungseinheiten|verwaltete|Einheiten\b", re.I)
+UNITS_AVOID = re.compile(r"saniert|sanieren|gebaut|errichtet|verkauft|vermittelt|sollte|nicht mehr als|maximal|höchstens|Verwaltungsbeginn|Referenz|Projekt", re.I)
+
+
+def _sentence(t: str, m: re.Match) -> str:
+    s0 = max(t.rfind(".", 0, m.start()), t.rfind("\n", 0, m.start())) + 1
+    ends = [i for i in (t.find(". ", m.end()), t.find("\n", m.end())) if i != -1]
+    # numbers in "facts" tiles often sit on their own line: include the next line too
+    e0 = min(ends) if ends else len(t)
+    nxt = t.find("\n", e0 + 1)
+    return t[s0: nxt if nxt != -1 and nxt - e0 < 80 else e0]
+
+
 def find_in_context(pages, key):
     want, avoid = CONTEXT[key]
     for p in pages:
@@ -120,10 +136,16 @@ def extract(pages: list[dict]) -> dict:
     # units: take the largest plausible number found anywhere (sites often say "über 2.500 Einheiten")
     best = None
     for p in pages:
-        for m in P["units"].finditer(p["text"]):
+        t = p["text"]
+        for m in P["units"].finditer(t):
             n = parse_units(m.group(1))
-            if n and (best is None or n > best[0]):
-                best = (n, _quote(p["text"], m), p["url"])
+            if not n:
+                continue
+            sent = _sentence(t, m)
+            if not UNITS_WANT.search(sent) or UNITS_AVOID.search(sent):
+                continue
+            if best is None or n > best[0]:
+                best = (n, _quote(t, m), p["url"])
     r["units"] = {"value": best[0], "quote": best[1], "url": best[2]} if best else ev(None, None)
 
     # metering provider: only counts if a relationship word is in the same sentence
@@ -190,8 +212,11 @@ def extract(pages: list[dict]) -> dict:
             continue
         for m in GF_LINE.finditer(p["text"]):
             for n in NAME.findall(m.group(1)):
-                n = re.sub(r"^(?:Kfm\.)\s+", "", n.strip()).rstrip("-").strip()
-                if not NOT_NAMES.search(n) and n not in names:
+                n = NAME_PREFIX.sub("", n.strip()).rstrip("-").strip()
+                tokens = [w for w in n.split() if w not in ("von", "van", "de", "zu") and not w.endswith(".")]
+                if len(tokens) < 2 or NAME_STOP.search(n) or any(NOUN_SUFFIX.search(w.lower()) for w in tokens):
+                    continue
+                if not NOT_NAMES.search(n) and n.lower() not in [x.lower() for x in names]:
                     names.append(n)
                     gf_hit = gf_hit or (m, _quote(p["text"], m), p["url"])
         if names:

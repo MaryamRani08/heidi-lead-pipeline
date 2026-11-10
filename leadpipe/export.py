@@ -50,7 +50,7 @@ def _format_sheet(ws, widths: dict[str, int] | None = None, wrap_cols: tuple[str
         if h in wrap_cols:
             for cell in ws[col][1:]:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-        if h in ("Website", "Evidence URL", "Source URL", "Directory profile"):
+        if h in ("Website", "Evidence URL", "Source URL", "Directory profile", "LinkedIn (manual check)"):
             for cell in ws[col][1:]:
                 if cell.value and str(cell.value).startswith("http"):
                     cell.hyperlink = str(cell.value)
@@ -86,10 +86,10 @@ def write(path, leads: pd.DataFrame, top: pd.DataFrame, excluded: pd.DataFrame, 
 
     wb = load_workbook(path)
     wide = {"Company": 34, "Why this lead?": 70, "Recommended sales angle": 42, "Evidence (quotes)": 80,
-            "Needs human review": 14, "Review notes": 40, "Website": 30, "Decision maker(s)": 28,
+            "Needs human review": 14, "Review notes": 40, "Manual verification note": 50, "LinkedIn (manual check)": 30, "Website": 30, "Decision maker(s)": 28,
             "What we measure": 50, "Why it matters for Heidi": 60, "Scoring rule": 55, "Metric": 45, "Value": 60,
             "Evidence quote": 70, "Extracted value": 30, "Source URL": 40, "Reason excluded": 45}
     for ws in wb.worksheets:
-        _format_sheet(ws, wide, wrap_cols=("Why this lead?", "Evidence (quotes)", "What we measure",
+        _format_sheet(ws, wide, wrap_cols=("Why this lead?", "Manual verification note", "Evidence (quotes)", "What we measure",
                                            "Why it matters for Heidi", "Scoring rule", "Evidence quote", "Review notes"))
     wb.save(path)

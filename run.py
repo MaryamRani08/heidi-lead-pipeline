@@ -80,6 +80,7 @@ def stage_enrich(cfg, client, args):
             out.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
             out.flush()
     s = _load_stats()
+    s.pop("llm claims grounded in source text", None)  # renamed metric from an earlier version
     s.update({"llm provider / model": f"{cfg['llm']['provider']} / {cfg['llm']['model']}" if llm.enabled else "not used",
               "llm calls (this run)": llm.stats["calls"], "llm cache hits (no API call needed)": llm.stats.get("cache_hits", 0), "llm valid JSON outputs": llm.stats["ok"],
               "llm claims made": llm.stats["claims"], "llm claims grounded + semantically supported": llm.stats["claims_grounded"],
@@ -101,18 +102,48 @@ def _evidence_text(f: dict) -> tuple[str, str]:
     return "\n".join(lines), " | ".join(urls)
 
 
+def _load_overrides():
+    """Human corrections from verification (data/manual_overrides.csv): every change keeps a note."""
+    p = DATA / "manual_overrides.csv"
+    if not p.exists():
+        return []
+    return pd.read_csv(p, dtype=str).fillna("").to_dict("records")
+
+
+def _overrides_for(name, overrides):
+    return [o for o in overrides if o["company_contains"] and o["company_contains"].lower() in str(name).lower()]
+
+
 def stage_score(cfg, args):
     recs = [json.loads(l) for l in ENRICHED.open(encoding="utf-8")]
+    overrides = _load_overrides()
+    n_overrides_applied = 0
     weights, th = cfg["weights"], cfg["priority_thresholds"]
     rows, facts_for_validation = [], []
     today = date.today().isoformat()
     for rec in recs:
         c = rec["company"]
         f = sc.merge(rec.get("rules") or {}, rec.get("llm"), c)
+        ovs = _overrides_for(c["name"], overrides)
+        notes, linkedin, clear = [], "", []
+        for o in ovs:
+            n_overrides_applied += 1
+            if o["field"] == "units":
+                v = o["value"].strip()
+                f["units"] = {"value": int(v) if v.isdigit() else None, "quote": o["note"], "url": "", "source": "manual"}
+            elif o["field"] == "decision_makers":
+                f["decision_makers"] = {"value": o["value"] or None, "quote": o["note"], "url": "", "source": "manual"}
+            elif o["field"] == "linkedin":
+                linkedin = o["value"]
+            elif o["field"] == "clear_flag":
+                clear.append(o["value"])
+            if o["note"]:
+                notes.append(o["note"])
         s = sc.score(f, weights)
         prio = "A" if s["total"] >= th["A"] else "B" if s["total"] >= th["B"] else "C"
         conf = sc.confidence(f, s, bool(rec["pages"]))
         flags = sc.review_flags(f, s, prio, conf, rec["fetch_status"], c.get("needs_review_flags", ""))
+        flags = [x for x in flags if x and x not in clear]
         ev_text, ev_urls = _evidence_text(f)
         types = [t for t, k in (("WEG", "weg"), ("Miet", "miet"), ("SEV", "sev"), ("Gewerbe", "gewerbe"), ("Makler", "broker")) if f[k]["value"]]
         rows.append({
@@ -120,7 +151,7 @@ def stage_score(cfg, args):
             "Website": c.get("website", ""), "Address": c.get("street", ""), "Postcode": c.get("postcode", ""),
             "Management types": ", ".join(types), "Units (stated)": f["units"]["value"],
             "Employees (directory)": f["employees"] or "",
-            "Decision maker(s)": f["decision_makers"]["value"] or "", "LinkedIn (manual check)": "",
+            "Decision maker(s)": f["decision_makers"]["value"] or "", "LinkedIn (manual check)": linkedin,
             "Email (direct)": f["email_personal"]["value"] or "", "Email (general)": f["email_generic"]["value"] or "",
             "Phone": f["phone"]["value"] or "", "Memberships": f["memberships"]["value"] or "",
             "Metering partner (evidenced)": f["metering_provider"]["value"] or "",
@@ -129,6 +160,7 @@ def stage_score(cfg, args):
             "Recommended sales angle": sc.sales_angle(f, s),
             "Why this lead?": sc.explain(c["name"], f, s, prio, conf),
             "Needs human review": "Yes" if flags else "No", "Review notes": "; ".join(flags),
+            "Manual verification note": " | ".join(notes),
             "Evidence (quotes)": ev_text, "Evidence URL": ev_urls.split(" | ")[0] if ev_urls else "",
             "All evidence URLs": ev_urls, "Directory rating": c.get("rating", ""),
             "Directory reviews": c.get("review_count", ""), "Directory profile": c.get("profile_url", ""),
@@ -146,7 +178,8 @@ def stage_score(cfg, args):
     leads.insert(0, "Rank", range(1, len(leads) + 1))
     top_cols = ["Rank", "Priority", "Lead score", "Confidence", "Company", "Website", "Management types",
                 "Units (stated)", "Decision maker(s)", "LinkedIn (manual check)", "Email (direct)", "Email (general)",
-                "Phone", "Recommended sales angle", "Why this lead?", "Needs human review", "Review notes", "Evidence URL"]
+                "Phone", "Recommended sales angle", "Why this lead?", "Needs human review", "Review notes",
+                "Manual verification note", "Evidence URL"]
     top = leads[top_cols].head(cfg["top_n"])
 
     random.seed(42)
@@ -170,6 +203,7 @@ def stage_score(cfg, args):
         "7 confidence High / Medium / Low": " / ".join(str(int((leads["Confidence"] == x).sum())) for x in ("High", "Medium", "Low")),
         "7 leads flagged for human review": int((leads["Needs human review"] == "Yes").sum()),
         "8 validation sample size (fields)": len(validation),
+        "8b manual corrections applied (data/manual_overrides.csv)": n_overrides_applied,
         "8 validation accuracy": "fill in after manual check (Validation tab)",
     })
     _save_stats(s)

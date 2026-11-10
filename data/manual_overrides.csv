@@ -1,0 +1,24 @@
+company_contains,field,value,note
+Frank Behrend,linkedin,https://www.linkedin.com/in/anke-behrend-7139363a1/,Anke Behrend (Geschäftsführerin) - LinkedIn matches Impressum
+Ralph Management,linkedin,https://www.linkedin.com/in/julius-gunnemann-83a77639/,Julius Gunnemann - LinkedIn matches Impressum
+Estavio,decision_makers,Dennis Käfer; Jonas Hochberger,Dennis Käfer confirmed via LinkedIn (current role at Estavio)
+Estavio,linkedin,https://www.linkedin.com/in/dennis-kaefer-estavio/,Dennis Käfer - LinkedIn
+Estavio,clear_flag,unclear business type from name,Website evidences WEG + rental management
+Hochheiden,decision_makers,Michelle Hochheiden-Welp; Victor Hochheiden,Both named in Impressum
+Hochheiden,linkedin,https://www.linkedin.com/in/michelle-hochheiden-welp-35479b285/,Michelle Hochheiden-Welp - LinkedIn current role confirmed
+Matera,clear_flag,unclear business type from name,Website evidences WEG full management (proptech property manager)
+WoBe,clear_flag,unclear business type from name,WOBEGE - website evidences Hausverwaltung
+m&a Grundstücksverwaltung,note,,Directory lists ~3 staff vs. 1500 units claimed on site and no managing director found - verify size before outreach
+HAMKON,units,,'350 Einheiten' on the site is a per-manager guideline - not the portfolio size; removed
+Hetzer,note,,Subsidiary of Buena (per Buena job ad on StepStone) - decision likely at group level
+SOLANO,note,,Same group as Wohnform (shared group profile page + same managing director) - approach as one account
+Wohnform,note,,Same group as SOLANO (shared group profile page + same managing director) - approach as one account
+Ernst G. Hachmann,decision_makers,,Extracted name was not a person - cleared
+Ernst G. Hachmann,note,,Headquartered in Hamburg with Berlin office - check who decides for Berlin
+Südhausbau,note,,Unit counts conflict (10000 vs 1200) - verify on website
+RENOVA,linkedin,not found,Searched LinkedIn - no profile
+Dantec,linkedin,not found,Searched LinkedIn - no profile
+M. Mende,linkedin,not found,Searched LinkedIn - no profile
+ABAKUS,linkedin,not found,Searched LinkedIn - no profile
+Fiechtner,linkedin,not found,Searched LinkedIn - no profile
+Kremer Hausverwaltungen,linkedin,not found,Searched LinkedIn - no matching profile
